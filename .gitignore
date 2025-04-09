@@ -50,3 +50,7 @@ Backend/my_model.h5
 
 # jupyter notebook checkpoints
 **/.ipynb_checkpoints
+
+
+# Firebase config
+/src/lib/firebase.js
