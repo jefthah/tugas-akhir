@@ -66,7 +66,11 @@ export default function LoginModal({ isOpen, onClose }) {
     e.preventDefault();
     try {
       const email = convertToEmail(nim);
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
       const user = userCredential.user;
 
       await fetchUserDetails(nim);
@@ -80,57 +84,67 @@ export default function LoginModal({ isOpen, onClose }) {
 
   return (
     <div
-      className={`fixed inset-0 bg-black bg-opacity-100 flex justify-center items-center z-50
-      ${isClosing ? "animate-fadeOut" : "animate-fadeIn"}`}
+      className={`fixed inset-0 bg-black flex justify-center items-center z-50
+  ${isClosing ? "animate-fadeOut" : "animate-fadeIn"}`}
       onClick={handleClose}
     >
       <div
-        className={`bg-white p-6 rounded-lg w-96 relative shadow-lg transition-transform
-        ${isClosing ? "animate-scaleOut" : "animate-scaleIn"}`}
+        className={`bg-white px-10 py-8 rounded-xl w-[500px] relative shadow-xl transition-transform
+    ${isClosing ? "animate-scaleOut" : "animate-scaleIn"}`}
         onClick={(e) => e.stopPropagation()}
       >
         <button
-          className="absolute top-[-20px] right-[-20px] w-12 h-12 flex items-center justify-center bg-red-500 text-white 
-          rounded-full hover:bg-red-700 transition"
+          className="absolute top-[-20px] right-[-20px] w-10 h-10 flex items-center justify-center bg-blue-600 text-white 
+      rounded-full hover:bg-blue-800 transition"
           onClick={handleClose}
         >
           ✖
         </button>
 
-        <h2 className="text-2xl font-bold mb-4 text-center text-gray-900">
+        <h2 className="text-2xl font-bold mb-6 text-center text-gray-900">
           Login to your account
         </h2>
 
         <form onSubmit={handleSubmit}>
-          <div className="mb-4">
+          <div className="mb-5">
             <input
               type="text"
               placeholder="Masukkan NIM"
               value={nim}
               onChange={(e) => setNim(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-black"
+              className="w-full px-5 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 bg-gray-50 text-black"
               required
             />
           </div>
 
-          <div className="mb-4">
+          <div className="mb-5">
             <input
               type="password"
-              placeholder="Masukkan Kata Sandi"
+              placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 text-black"
+              className="w-full px-5 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-600 bg-gray-50 text-black"
               required
             />
           </div>
 
           {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
+          <div className="flex items-center justify-between mb-6">
+            <label className="flex items-center space-x-2 text-sm">
+              <input type="checkbox" className="form-checkbox text-blue-600" />
+              <span>Ingat username</span>
+            </label>
+            <a href="#" className="text-sm text-red-500 hover:underline">
+              Lupa kata sandi?
+            </a>
+          </div>
+
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700 transition duration-300"
+            className="w-full bg-blue-900 text-white py-3 rounded-md hover:bg-blue-800 transition duration-300"
           >
-            Log in
+            Masuk
           </button>
         </form>
       </div>

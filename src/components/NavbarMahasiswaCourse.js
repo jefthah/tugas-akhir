@@ -12,15 +12,12 @@ import {
   FaUserCircle,
 } from "react-icons/fa";
 import Cookies from "js-cookie";
-import SidebarMahasiswa from "./SidebarMahasiswa";
 
-export default function NavbarMahasiswa({sidebarOpen, setSidebarOpen}) {
+export default function NavbarMahasiswaCourse({ sidebarOpen, setSidebarOpen }) {
   const router = useRouter();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [languageDropdownOpen, setLanguageDropdownOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showNavbar, setShowNavbar] = useState(true);
-  const [lastScrollTop, setLastScrollTop] = useState(0);
   const [userData, setUserData] = useState({ name: "", email: "" });
 
   useEffect(() => {
@@ -37,19 +34,6 @@ export default function NavbarMahasiswa({sidebarOpen, setSidebarOpen}) {
     }
   }, []);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      if (currentScrollY > 50) {
-        setShowNavbar(true); // Scroll bawah -> Navbar muncul
-      }
-    };
-  
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-  
-
   const handleLogout = () => {
     Cookies.remove("session_mahasiswa");
     router.push("/mahasiswa/login");
@@ -57,18 +41,9 @@ export default function NavbarMahasiswa({sidebarOpen, setSidebarOpen}) {
 
   return (
     <>
-      <header
-        className={`fixed top-0 w-full z-50 transition-transform duration-500 ${
-          showNavbar ? "translate-y-0 animate-slideDown" : "-translate-y-full"
-        }`}
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, #4C4AEA, #6B3EC7, #9F2FA4, #D41E77, #F6125A)",
-          boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-        }}
-      >
-        <div className="flex items-center justify-between px-4 md:px-8 py-5 ">
-          {/* Logo di kiri */}
+      <header className="fixed top-0 w-full z-50 backdrop-blur-md bg-transparent">
+        <div className="flex items-center justify-between px-4 md:px-8 py-5 text-white">
+          {/* Logo */}
           <div className="flex items-center space-x-10">
             <Image
               src="/images/logo/leads_poppins.png"
@@ -78,7 +53,7 @@ export default function NavbarMahasiswa({sidebarOpen, setSidebarOpen}) {
               priority
             />
             {/* Menu */}
-            <nav className="hidden xl:flex space-x-6 text-white font-light text-[18px] ml-6">
+            <nav className="hidden xl:flex space-x-6 font-light text-[18px] ml-6">
               <button
                 onClick={() => router.push("/")}
                 className="hover:underline"
@@ -127,9 +102,8 @@ export default function NavbarMahasiswa({sidebarOpen, setSidebarOpen}) {
             </nav>
           </div>
 
-          {/* Icons + Hamburger di kanan */}
-          <div className="flex items-center space-x-4 text-white">
-            {/* Desktop icons */}
+          {/* Icons */}
+          <div className="flex items-center space-x-4">
             {isLoggedIn && (
               <div className="hidden xl:flex items-center space-x-4 relative">
                 <div className="bg-white/20 p-2 rounded-full hover:bg-white/30 cursor-pointer">
@@ -220,8 +194,6 @@ export default function NavbarMahasiswa({sidebarOpen, setSidebarOpen}) {
                 )}
               </div>
             )}
-
-            {/* Hamburger Button (hanya di Mobile) */}
             <button
               className="xl:hidden text-3xl"
               onClick={(e) => {
@@ -234,23 +206,6 @@ export default function NavbarMahasiswa({sidebarOpen, setSidebarOpen}) {
           </div>
         </div>
       </header>
-
-      {/* Animasi global */}
-      <style jsx global>{`
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-20%);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-slideDown {
-          animation: slideDown 0.5s ease forwards;
-        }
-      `}</style>
     </>
   );
 }

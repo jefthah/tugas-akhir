@@ -1,15 +1,15 @@
-// mahasiswa/mataKuliah/[namaMataKuliah]
-
 "use client";
+
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
-import Navbar from "@/components/Navbar";
+import NavbarMahasiswaCourse from "@/components/NavbarMahasiswaCourse";
+import SidebarMahasiswa from "@/components/SidebarMahasiswa";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 const Breadcrumb = ({ path }) => (
-  <nav className="text-white text-sm mt-2 text-center">
+  <nav className="text-white text-sm mt-1 text-center opacity-80">
     {path.map((item, index) => (
       <span key={index}>
         {item}
@@ -24,6 +24,7 @@ const CourseDetail = ({ params }) => {
   const [course, setCourse] = useState(null);
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const router = useRouter();
 
   const decodedNamaMataKuliah = decodeURIComponent(namaMataKuliah);
@@ -32,12 +33,10 @@ const CourseDetail = ({ params }) => {
     const fetchCourseData = async () => {
       if (decodedNamaMataKuliah) {
         const courseRef = doc(db, "mataKuliah", decodedNamaMataKuliah);
-
         try {
           const courseDoc = await getDoc(courseRef);
           if (courseDoc.exists()) {
             setCourse(courseDoc.data());
-
             const pertemuanRef = collection(courseRef, "Pertemuan");
             const pertemuanSnapshot = await getDocs(pertemuanRef);
             const topicsList = await Promise.all(
@@ -55,16 +54,12 @@ const CourseDetail = ({ params }) => {
                 };
               })
             );
-
             setTopics(topicsList);
           } else {
-            console.error(
-              "Course tidak ditemukan di Firestore:",
-              courseRef.path
-            );
+            console.error("Course tidak ditemukan:", courseRef.path);
           }
         } catch (error) {
-          console.error("Error fetching course data:", error);
+          console.error("Error fetching course:", error);
         } finally {
           setLoading(false);
         }
@@ -74,21 +69,46 @@ const CourseDetail = ({ params }) => {
     fetchCourseData();
   }, [decodedNamaMataKuliah]);
 
-  if (loading) {
-    return <div>Loading...</div>;
-  }
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1280) {
+        setSidebarOpen(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
-  if (!course) {
-    return <div>Course tidak ditemukan</div>;
-  }
+  if (loading) return <div className="p-8">Loading...</div>;
+  if (!course) return <div className="p-8">Course tidak ditemukan</div>;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <Navbar />
-      <header className="bg-gradient-to-r from-purple-500 to-pink-500 p-8 text-white flex flex-col items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold">
-            2024 Ganjil | {decodedNamaMataKuliah.toUpperCase()}
+    <div className="relative min-h-screen overflow-x-hidden">
+      {/* Sidebar */}
+      <SidebarMahasiswa
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        handleLogout={() => {}}
+        userData={{ name: "Nama Mahasiswa", email: "email@domain.com" }}
+      />
+
+      {/* Konten */}
+      <div
+        className={`transition-all duration-300 ease-in-out ${
+          sidebarOpen ? "ml-80" : "ml-0"
+        }`}
+        onClick={() => sidebarOpen && setSidebarOpen(false)}
+      >
+        {/* Navbar Transparan */}
+        <NavbarMahasiswaCourse
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+        />
+
+        {/* Header Gradient Lebih Tinggi */}
+        <div className="pt-32 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 min-h-[420px] flex flex-col justify-center items-center text-white">
+          <h1 className="text-4xl font-bold mb-4 text-center">
+            2024 GANJIL | {decodedNamaMataKuliah.toUpperCase()}
           </h1>
           <Breadcrumb
             path={[
@@ -101,25 +121,23 @@ const CourseDetail = ({ params }) => {
             ]}
           />
         </div>
-      </header>
-      <main className="flex-1 p-8">
-        <section className="container mx-auto bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">
-            Course Content
-          </h2>
-          <div className="space-y-4">
-            {topics.map((topic, index) => (
-              <details key={index} className="rounded-lg">
-                <summary className="font-semibold text-gray-800 cursor-pointer bg-gray-100 px-4 py-2 rounded-lg border border-gray-300">
-                  Pertemuan {index + 1}: {topic.topic || "No Topic Available"}
-                </summary>
 
-                <div className="mt-4 text-gray-600 p-4 bg-white">
-                  {/* Link Presensi */}
-                  {topic.absensi.length > 0 ? (
-                    topic.absensi.map((absen, idx) => (
-                      <div key={idx} className="mt-2">
-                        <div className="flex items-center">
+        {/* Main Content */}
+        <main className="flex-1 p-8 bg-gray-50">
+          <section className="container mx-auto bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              Course Content
+            </h2>
+            <div className="space-y-4">
+              {topics.map((topic, index) => (
+                <details key={index} className="rounded-lg">
+                  <summary className="font-semibold text-gray-800 cursor-pointer bg-gray-100 px-4 py-2 rounded-lg border border-gray-300">
+                    Pertemuan {index + 1}: {topic.topic || "No Topic Available"}
+                  </summary>
+                  <div className="mt-4 text-gray-600 p-4 bg-white">
+                    {topic.absensi.length > 0 ? (
+                      topic.absensi.map((absen, idx) => (
+                        <div key={idx} className="flex items-center mt-2">
                           <Image
                             src="/images/icon/iconPresensi.png"
                             alt="Presence Icon"
@@ -136,19 +154,19 @@ const CourseDetail = ({ params }) => {
                             Presensi
                           </a>
                         </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-gray-500">
-                      Belum ada presensi untuk pertemuan ini.
-                    </p>
-                  )}
-                </div>
-              </details>
-            ))}
-          </div>
-        </section>
-      </main>
+                      ))
+                    ) : (
+                      <p className="text-gray-500">
+                        Belum ada presensi untuk pertemuan ini.
+                      </p>
+                    )}
+                  </div>
+                </details>
+              ))}
+            </div>
+          </section>
+        </main>
+      </div>
     </div>
   );
 };

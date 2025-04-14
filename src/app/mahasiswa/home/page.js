@@ -61,6 +61,17 @@ const MahasiswaDashboard = () => {
   }, [router]);
 
   useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1280) {
+        setSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
     const fetchCourses = async () => {
       setLoading(true);
       try {
@@ -104,8 +115,8 @@ const MahasiswaDashboard = () => {
       {/* Konten utama */}
       <div
         onClick={() => sidebarOpen && setSidebarOpen(false)}
-        className={`transition-transform duration-300 ease-in-out ${
-          sidebarOpen ? "translate-x-64 lg:translate-x-0" : "translate-x-0"
+        className={`transition-all duration-300 ease-in-out ${
+          sidebarOpen ? "ml-80" : "ml-0"
         }`}
       >
         {/* Navbar */}
