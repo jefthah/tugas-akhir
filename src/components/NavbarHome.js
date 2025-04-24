@@ -91,7 +91,7 @@ export default function NavbarHome({ sidebarOpen, setSidebarOpen }) {
                 <Image
                   src={
                     isScrolled
-                      ? "/images/logo/leads_poppins_dark.png"
+                      ? "/images/logo/leads poppins_dark.png"
                       : "/images/logo/leads_poppins.png"
                   }
                   alt="LeADS Logo"
