@@ -49,8 +49,6 @@ def register_image():
     return jsonify({"message": f"✅ Gambar berhasil disimpan di {file_path}"})
 
 
-
-
 @app.route("/train-model", methods=["POST"])
 def train_model():
     try:

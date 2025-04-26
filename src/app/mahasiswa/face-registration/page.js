@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import NavbarHome from "@/components/NavbarHome";
 import Footer from "@/components/Footer";
 import Cookies from "js-cookie";
+import * as faceapi from "face-api.js";
 
 export default function FaceRegistrationPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -15,62 +16,60 @@ export default function FaceRegistrationPage() {
   const [isTraining, setIsTraining] = useState(false);
   const videoRef = useRef(null);
   const router = useRouter();
+  const streamRef = useRef(null);
 
-  // Ambil data session dari cookie
+  // Load face-api.js model
   useEffect(() => {
-    const session = JSON.parse(Cookies.get("session_mahasiswa") || "null");
-    if (session?.isLoggedIn) {
-      setIsLoggedIn(true);
-      setUser(session);
-    }
-  }, []);
-
-  // Nyalakan kamera
-  useEffect(() => {
-    let stream;
-  
-    navigator.mediaDevices
-      .getUserMedia({ video: true })
-      .then((s) => {
-        stream = s;
-        if (videoRef.current) {
-          videoRef.current.srcObject = s;
-        }
-      })
-      .catch((error) => {
-        console.error("Camera error:", error);
-        setMessage("❌ Kamera tidak tersedia.");
-      });
-  
-    // Cleanup: stop camera when component unmounts
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+    const loadModels = async () => {
+      try {
+        await faceapi.nets.tinyFaceDetector.loadFromUri(
+          "/models/tiny_face_detector"
+        );
+        console.log("✅ Model face-api.js loaded");
+      } catch (error) {
+        console.error("❌ Error loading model:", error);
+        setMessage("❌ Gagal memuat model deteksi wajah.");
       }
     };
+    loadModels();
   }, []);
-  
 
-  // Auto capture wajah
-  useEffect(() => {
-    if (!videoRef.current || capturedCount >= 5 || user.nim.length !== 10) return;
-
-    const interval = setInterval(() => {
-      captureAndUpload();
-    }, 1500);
-
-    return () => clearInterval(interval);
-  }, [capturedCount, user.nim]);
-
-  const captureAndUpload = async () => {
+  const captureAndUpload = useCallback(async () => {
     if (!videoRef.current) return;
 
+    const video = videoRef.current;
     const canvas = document.createElement("canvas");
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    canvas.getContext("2d").drawImage(videoRef.current, 0, 0);
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      console.warn("⚠️ Video belum siap, width/height = 0");
+      return;
+    }
 
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg"));
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      console.warn("❌ Tidak bisa mendapatkan context canvas");
+      return;
+    }
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // 🔍 Deteksi wajah
+    const detection = await faceapi.detectSingleFace(
+      canvas,
+      new faceapi.TinyFaceDetectorOptions()
+    );
+
+    if (!detection) {
+      setMessage("⚠️ Arahkan wajah Anda ke kamera.");
+      return;
+    }
+
+    // ✅ lanjutkan upload
+    const blob = await new Promise((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg")
+    );
 
     const formData = new FormData();
     formData.append("file", blob);
@@ -102,16 +101,18 @@ export default function FaceRegistrationPage() {
 
           if (trainRes.ok) {
             setMessage("✅ Pelatihan selesai. Mengalihkan ke login...");
-            
-            // HAPUS COOKIE agar user harus login ulang
+
+            // 🛑 Matikan kamera dulu
+            if (streamRef.current) {
+              streamRef.current.getTracks().forEach((track) => track.stop());
+              streamRef.current = null;
+            }
+
             Cookies.remove("session_mahasiswa");
-          
-            // Redirect ke halaman login setelah 2 detik
             setTimeout(() => router.push("/mahasiswa/login"), 2000);
           } else {
             setMessage("⚠️ Gagal melatih model: " + trainJson.output);
           }
-          
         }
       } else {
         setMessage("❌ Gagal menyimpan gambar: " + result.error);
@@ -120,7 +121,52 @@ export default function FaceRegistrationPage() {
       console.error("Upload error:", err);
       setMessage("❌ Terjadi kesalahan saat upload.");
     }
-  };
+  }, [capturedCount, router, user.nim]);
+
+  // Ambil data session dari cookie
+  useEffect(() => {
+    const session = JSON.parse(Cookies.get("session_mahasiswa") || "null");
+    if (session?.isLoggedIn) {
+      setIsLoggedIn(true);
+      setUser(session);
+    }
+  }, []);
+
+  // Nyalakan kamera
+  useEffect(() => {
+    let stream;
+    navigator.mediaDevices
+      .getUserMedia({ video: true })
+      .then((s) => {
+        streamRef.current = s; // simpan ke ref
+        if (videoRef.current) {
+          videoRef.current.srcObject = s;
+        }
+      })
+
+      .catch((error) => {
+        console.error("Camera error:", error);
+        setMessage("❌ Kamera tidak tersedia.");
+      });
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, []);
+
+  // Auto capture wajah
+  useEffect(() => {
+    if (!videoRef.current || capturedCount >= 5 || user.nim.length !== 10)
+      return;
+
+    const interval = setInterval(() => {
+      captureAndUpload();
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [capturedCount, user.nim, captureAndUpload]);
 
   return (
     <div className="min-h-screen bg-white">

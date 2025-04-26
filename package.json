@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "face-api.js": "^0.22.2",
     "firebase": "^11.4.0",
     "js-cookie": "^3.0.5",
     "next": "^14.2.24",

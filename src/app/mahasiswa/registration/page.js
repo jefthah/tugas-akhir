@@ -69,13 +69,15 @@ export default function MahasiswaRegisterPage() {
       });
 
       // Simpan session
-      Cookies.set("session_mahasiswa", JSON.stringify({
-        isLoggedIn: true,
-        nim,
-        name,
-        email,
-      }));
-      
+      Cookies.set(
+        "session_mahasiswa",
+        JSON.stringify({
+          isLoggedIn: true,
+          nim,
+          name,
+          email,
+        })
+      );
 
       router.push("/mahasiswa/face-registration");
     } catch (err) {
@@ -103,8 +105,11 @@ export default function MahasiswaRegisterPage() {
         </p>
       </div>
 
-      <main className="flex flex-col items-center justify-center pb-10 bg-white min-h-[40vh]">
-        <form onSubmit={handleRegister} className="bg-white p-10 rounded-lg w-full max-w-xl mx-auto mt-16">
+      <main className="flex flex-col items-center justify-center pb-10 bg-white min-h-[40vh] px-4 sm:px-6">
+        <form
+          onSubmit={handleRegister}
+          className="bg-white px-6 py-10 sm:p-10 rounded-lg w-full max-w-md sm:max-w-xl mt-10 sm:mt-16 shadow-md"
+        >
           <h2 className="text-center text-2xl font-bold mb-8">Register</h2>
 
           {/* NIM */}
@@ -114,9 +119,9 @@ export default function MahasiswaRegisterPage() {
               placeholder="NIM (10 digit)"
               value={nim}
               onChange={(e) => setNim(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-md bg-gray-50 text-black text-lg"
+              className="w-full px-4 py-3 border border-gray-300 rounded-md bg-gray-50 text-black text-base sm:text-lg"
               maxLength={10}
-              minLength={10} // Tambahan opsional
+              minLength={10}
               required
             />
           </div>
@@ -125,9 +130,13 @@ export default function MahasiswaRegisterPage() {
           {nimTaken && (
             <p className="text-sm text-red-600 mb-4">
               NIM sudah terdaftar.{" "}
-              <a href="/mahasiswa/login" className="text-blue-600 hover:underline font-medium">
+              <a
+                href="/mahasiswa/login"
+                className="text-blue-600 hover:underline font-medium"
+              >
                 Silakan login
-              </a>.
+              </a>
+              .
             </p>
           )}
 
@@ -139,26 +148,26 @@ export default function MahasiswaRegisterPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               disabled={nimTaken}
-              className="w-full px-4 py-3 border border-gray-300 rounded-md bg-gray-50 text-black text-lg"
+              className="w-full px-4 py-3 border border-gray-300 rounded-md bg-gray-50 text-black text-base sm:text-lg"
               required
             />
           </div>
 
-          {/* Email */}
-          <div className="mb-4 flex gap-2 items-center">
+          {/* Email & Generate */}
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:gap-2">
             <input
               type="text"
               placeholder="Email"
               value={email}
               readOnly
               disabled={nimTaken}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-md bg-gray-50 text-black text-lg"
+              className="flex-1 px-4 py-3 border border-gray-300 rounded-md bg-gray-50 text-black text-base sm:text-lg mb-2 sm:mb-0"
             />
             <button
               type="button"
               onClick={generateEmail}
               disabled={nimTaken}
-              className="px-4 py-2 text-sm rounded-md text-white bg-blue-500 hover:bg-blue-600"
+              className="px-4 py-2 text-sm rounded-md text-white bg-blue-500 hover:bg-blue-600 w-full sm:w-auto"
             >
               Generate Email
             </button>
@@ -174,7 +183,7 @@ export default function MahasiswaRegisterPage() {
               disabled={nimTaken}
               pattern="[0-9]{6,}"
               title="Password harus angka minimal 6 digit"
-              className="w-full px-4 py-3 border border-gray-300 rounded-md bg-gray-50 text-black text-lg"
+              className="w-full px-4 py-3 border border-gray-300 rounded-md bg-gray-50 text-black text-base sm:text-lg"
               required
             />
           </div>
@@ -189,7 +198,7 @@ export default function MahasiswaRegisterPage() {
           {/* Submit */}
           <button
             type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-md text-lg font-semibold"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-md text-lg font-semibold transition"
           >
             Next
           </button>

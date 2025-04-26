@@ -8,7 +8,7 @@ import { auth, app } from "@/lib/firebase";
 import NavbarHome from "@/components/NavbarHome";
 import Footer from "@/components/Footer";
 import Cookies from "js-cookie";
-import LoginForm from "@/components/LoginForm"; // Import komponen
+import LoginForm from "@/components/LoginForm";
 
 export default function MahasiswaLoginPage() {
   const router = useRouter();
@@ -20,6 +20,7 @@ export default function MahasiswaLoginPage() {
   const [nimExists, setNimExists] = useState(null);
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -64,6 +65,7 @@ export default function MahasiswaLoginPage() {
       await signInWithEmailAndPassword(auth, email, password);
       await fetchUserDetails(nim);
       setIsLoggedIn(true);
+      setIsRedirecting(true); // prevent UI flicker
       router.replace(`/mahasiswa/home`);
     } catch (err) {
       console.error("Login error:", err);
@@ -125,7 +127,8 @@ export default function MahasiswaLoginPage() {
     }
   };
 
-  if (checkingSession) return null;
+  // Jangan render apapun saat proses redirect atau session sedang dicek
+  if (checkingSession || isRedirecting) return null;
 
   return (
     <div className="min-h-screen" onClick={handlePageClick}>

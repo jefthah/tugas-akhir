@@ -6,14 +6,61 @@ import { auth } from "@/lib/firebase";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { app } from "@/lib/firebase";
-import Cookies from "js-cookie"; // <-- tambah ini
+import Cookies from "js-cookie";
 
 export default function LoginModal({ isOpen, onClose }) {
   const [nim, setNim] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [nimExists, setNimExists] = useState(null); // <-- status NIM
   const [isClosing, setIsClosing] = useState(false);
   const router = useRouter();
+
+  // ⏳ Cek NIM real-time setiap kali nim berubah
+  useEffect(() => {
+    const checkNim = async () => {
+      if (!nim.trim()) {
+        setNimExists(null); // input kosong
+        return;
+      }
+  
+      try {
+        const userRef = doc(getFirestore(app), "mahasiswa", nim.trim());
+        const userDoc = await getDoc(userRef);
+        setNimExists(userDoc.exists());
+      } catch (error) {
+        console.error("Error checking NIM:", error);
+        setNimExists(null);
+      }
+    };
+  
+    checkNim();
+  }, [nim]);
+
+  useEffect(() => {
+    const delay = setTimeout(() => {
+      if (!nim.trim()) {
+        setNimExists(null);
+        return;
+      }
+  
+      const checkNim = async () => {
+        try {
+          const userRef = doc(getFirestore(app), "mahasiswa", nim.trim());
+          const userDoc = await getDoc(userRef);
+          setNimExists(userDoc.exists());
+        } catch (err) {
+          console.error(err);
+          setNimExists(null);
+        }
+      };
+  
+      checkNim();
+    }, 500); // delay 0.5 detik setelah user berhenti mengetik
+  
+    return () => clearTimeout(delay);
+  }, [nim]);
+  
 
   useEffect(() => {
     if (isOpen) {
@@ -33,7 +80,6 @@ export default function LoginModal({ isOpen, onClose }) {
       if (userDoc.exists()) {
         const userData = userDoc.data();
 
-        // Simpan ke Cookies
         Cookies.set(
           "session_mahasiswa",
           JSON.stringify({
@@ -71,8 +117,6 @@ export default function LoginModal({ isOpen, onClose }) {
         email,
         password
       );
-      const user = userCredential.user;
-
       await fetchUserDetails(nim);
     } catch (error) {
       console.error("Error during login:", error);
@@ -106,7 +150,7 @@ export default function LoginModal({ isOpen, onClose }) {
         </h2>
 
         <form onSubmit={handleSubmit}>
-          <div className="mb-5">
+          <div className="mb-2">
             <input
               type="text"
               placeholder="Masukkan NIM"
@@ -117,7 +161,21 @@ export default function LoginModal({ isOpen, onClose }) {
             />
           </div>
 
-          <div className="mb-5">
+          {/* 👇 Tampilkan jika NIM tidak ditemukan */}
+          {nimExists === false && (
+            <p className="text-sm text-red-600 mt-1">
+              NIM tidak ditemukan.{" "}
+              <button
+                type="button"
+                onClick={() => router.push("/mahasiswa/registration")}
+                className="text-blue-600 hover:underline font-semibold"
+              >
+                Daftar sekarang
+              </button>
+            </p>
+          )}
+
+          <div className="mb-5 mt-4">
             <input
               type="password"
               placeholder="Password"
