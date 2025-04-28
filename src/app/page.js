@@ -1,13 +1,12 @@
-// app/page.js
-
-"use client"
+"use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getFirestore, doc, getDoc } from "firebase/firestore";
 import { app } from "@/lib/firebase";
-import NavbarHome from "@/components/NavbarHome"; // Import NavbarHome
-import Slider from "@/components/Slider"; // Import Slider
+import NavbarHome from "@/components/NavbarHome";
+import Slider from "@/components/Slider";
+import Sidebar from "@/components/Sidebar";
 
 export default function HomePage() {
   const router = useRouter();
@@ -16,7 +15,6 @@ export default function HomePage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const db = getFirestore(app);
 
-  // useEffect untuk menghapus atribut cz-shortcut-listen
   useEffect(() => {
     if (document.body.hasAttribute("cz-shortcut-listen")) {
       document.body.removeAttribute("cz-shortcut-listen");
@@ -50,28 +48,60 @@ export default function HomePage() {
     sessionStorage.removeItem("session_mahasiswa");
     setIsLoggedIn(false);
     setUser({ nim: "", name: "", email: "" });
-    router.push("/"); // Redirect ke halaman utama
+    router.push("/");
   };
 
-  // Fungsi untuk menutup sidebar ketika mengklik di luar sidebar
-  const handlePageClick = (event) => {
-    if (sidebarOpen && !event.target.closest(".sidebar")) {
-      setSidebarOpen(false); // Menutup sidebar jika area di luar sidebar diklik
-    }
+  const handleNavigation = (path) => {
+    setSidebarOpen(false);
+    router.push(path);
   };
+
+  // 🆕 Close sidebar automatically if resizing to desktop
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) { // 1024px = Tailwind 'lg'
+        setSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
 
   return (
-    <div className="min-h-screen relative" onClick={handlePageClick}>
-      {/* Background Image from Slider */}
-      <Slider />
-
-      {/* Navbar */}
-      <NavbarHome 
-        isLoggedIn={isLoggedIn} 
-        handleLogout={handleLogout} 
-        sidebarOpen={sidebarOpen} 
-        setSidebarOpen={setSidebarOpen} 
+    <div className="relative min-h-screen overflow-hidden bg-gray-100">
+      {/* Sidebar */}
+      <Sidebar
+        sidebarOpen={sidebarOpen}
+        handleNavigation={handleNavigation}
+        isLoggedIn={isLoggedIn}
+        handleLogout={handleLogout}
       />
+
+      {/* Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-30 z-40"
+          onClick={() => setSidebarOpen(false)}
+        ></div>
+      )}
+
+      {/* Wrapper Konten Utama */}
+      <div className="relative z-30 flex flex-col min-h-screen">
+        <NavbarHome
+          isLoggedIn={isLoggedIn}
+          handleLogout={handleLogout}
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+        />
+        <main className="flex-1">
+          <Slider />
+          {/* Tambahkan konten lain di sini */}
+        </main>
+      </div>
     </div>
   );
 }
