@@ -52,4 +52,5 @@ Backend/dataset_model_skripsi/
 Backend/face_recognition_mediapipe.h5
 
 # Ignore virtual environment
-.venv/
+.venv310/
+

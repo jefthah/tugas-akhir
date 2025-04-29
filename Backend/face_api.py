@@ -1,23 +1,27 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
-from train import train_model  # Import fungsi langsung!
+import shutil
+from train_and_export import train_and_export_model  # Import dari file baru
 
 app = Flask(__name__)
 CORS(app)
 
-# === Config ===
+# === Config Paths ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATASET_DIR = os.path.join(BASE_DIR, "dataset_model_skripsi")
-MODEL_PATH = os.path.join(BASE_DIR, "face_recognition_mediapipe.h5")
+MODEL_DIR = os.path.join(BASE_DIR, "..", "public", "models", "face_recognition")
 NIM_LOG_FILE = os.path.join(BASE_DIR, "..", "last_registered_nim.txt")
+
+# === Basic Routes ===
 
 @app.route("/")
 def index():
-    return jsonify({"message": "Flask API aktif"})
+    return jsonify({"message": "Flask API aktif 🔥"})
 
 @app.route("/register-image", methods=["POST"])
 def register_image():
+    """Upload gambar wajah untuk satu NIM"""
     if "file" not in request.files or "nim" not in request.form:
         return jsonify({"error": "Missing file or NIM"}), 400
 
@@ -27,34 +31,47 @@ def register_image():
     if not nim or not nim.isdigit() or len(nim) != 10:
         return jsonify({"error": "NIM tidak valid"}), 400
 
-    print(f"[DEBUG] NIM diterima: {nim}")
+    save_folder = os.path.join(DATASET_DIR, nim)
+    os.makedirs(save_folder, exist_ok=True)
 
-    save_path = os.path.join(DATASET_DIR, nim)
-    os.makedirs(save_path, exist_ok=True)
+    existing_files = [f for f in os.listdir(save_folder) if f.endswith((".jpg", ".png", ".jpeg"))]
+    filename = f"{nim}_{len(existing_files) + 1}.jpg"
+    save_path = os.path.join(save_folder, filename)
 
-    existing_files = [f for f in os.listdir(save_path) if f.startswith(nim)]
-    file_count = len(existing_files)
-    filename = f"{nim}_{file_count + 1}.jpg"
+    file.save(save_path)
 
-    file_path = os.path.join(save_path, filename)
-    file.save(file_path)
-
-    # Simpan NIM terakhir
+    # Update last registered NIM (opsional)
     with open(NIM_LOG_FILE, "w") as f:
         f.write(nim)
 
-    return jsonify({"message": f"✅ Gambar berhasil disimpan di {file_path}"})
+    return jsonify({"message": f"✅ Gambar berhasil disimpan: {filename}"}), 200
 
 @app.route("/train-model", methods=["POST"])
-def train_model_api():
+def train_model_route():
+    """Train model + export otomatis ke TensorFlow.js + buat labels.json"""
     try:
-        if not os.path.exists(NIM_LOG_FILE):
-            return jsonify({"error": "Tidak ada NIM terdaftar"}), 400
+        print("🔄 Memulai proses pelatihan model...")  # Log proses pelatihan
+        # Bersihkan model lama dulu
+        if os.path.exists(MODEL_DIR):
+            shutil.rmtree(MODEL_DIR)
+        os.makedirs(MODEL_DIR, exist_ok=True)
 
-        result = train_model()
-        return jsonify({"status": "success", "output": result})
+        result = train_and_export_model()
+        print("✅ Model selesai dilatih dan diekspor.")  # Log jika pelatihan berhasil
+        return jsonify({
+            "status": "success",
+            "output": result
+        }), 200
+
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+        print(f"❌ Error saat training: {e}")  # Menampilkan detail error
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+
+# === Main ===
 
 if __name__ == "__main__":
     app.run(debug=True, port=8000)

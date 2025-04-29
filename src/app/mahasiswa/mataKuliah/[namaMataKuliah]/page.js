@@ -1,23 +1,14 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import NavbarMahasiswaCourse from "@/components/NavbarMahasiswaCourse";
 import SidebarMahasiswa from "@/components/SidebarMahasiswa";
+import HeaderMahasiswaCourse from "@/components/HeaderMahasiswaCourse";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import Footer from "@/components/Footer";
 
-const Breadcrumb = ({ path }) => (
-  <nav className="text-white text-sm mt-1 text-center opacity-80">
-    {path.map((item, index) => (
-      <span key={index}>
-        {item}
-        {index < path.length - 1 && " / "}
-      </span>
-    ))}
-  </nav>
-);
 
 const CourseDetail = ({ params }) => {
   const { namaMataKuliah } = params;
@@ -37,6 +28,7 @@ const CourseDetail = ({ params }) => {
           const courseDoc = await getDoc(courseRef);
           if (courseDoc.exists()) {
             setCourse(courseDoc.data());
+
             const pertemuanRef = collection(courseRef, "Pertemuan");
             const pertemuanSnapshot = await getDocs(pertemuanRef);
             const topicsList = await Promise.all(
@@ -99,28 +91,24 @@ const CourseDetail = ({ params }) => {
         }`}
         onClick={() => sidebarOpen && setSidebarOpen(false)}
       >
-        {/* Navbar Transparan */}
+        {/* Navbar */}
         <NavbarMahasiswaCourse
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
         />
 
-        {/* Header Gradient Lebih Tinggi */}
-        <div className="pt-32 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 min-h-[420px] flex flex-col justify-center items-center text-white">
-          <h1 className="text-4xl font-bold mb-4 text-center">
-            2024 GANJIL | {decodedNamaMataKuliah.toUpperCase()}
-          </h1>
-          <Breadcrumb
-            path={[
-              "Dashboard",
-              "Courses",
-              "2024/2025 Ganjil",
-              "Fakultas Ilmu Komputer",
-              "S1 Informatika",
-              decodedNamaMataKuliah,
-            ]}
-          />
-        </div>
+        {/* Header menggunakan komponen */}
+        <HeaderMahasiswaCourse
+          title={`2024 GANJIL | ${decodedNamaMataKuliah.toUpperCase()}`}
+          path={[
+            "Dashboard",
+            "Courses",
+            "2024/2025 Ganjil",
+            "Fakultas Ilmu Komputer",
+            "S1 Informatika",
+            decodedNamaMataKuliah,
+          ]}
+        />
 
         {/* Main Content */}
         <main className="flex-1 p-8 bg-gray-50">
@@ -128,7 +116,19 @@ const CourseDetail = ({ params }) => {
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
               Course Content
             </h2>
+
             <div className="space-y-4">
+              {/* General Section */}
+              <details className="rounded-lg">
+                <summary className="font-semibold text-gray-800 cursor-pointer bg-gray-100 px-4 py-2 rounded-lg border border-gray-300">
+                  General
+                </summary>
+                <div className="mt-4 text-gray-600 p-4 bg-white">
+                  <p>{course.description || "Deskripsi tidak tersedia."}</p>
+                </div>
+              </details>
+
+              {/* List Pertemuan */}
               {topics.map((topic, index) => (
                 <details key={index} className="rounded-lg">
                   <summary className="font-semibold text-gray-800 cursor-pointer bg-gray-100 px-4 py-2 rounded-lg border border-gray-300">
@@ -166,6 +166,7 @@ const CourseDetail = ({ params }) => {
             </div>
           </section>
         </main>
+        <Footer />
       </div>
     </div>
   );

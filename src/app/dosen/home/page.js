@@ -1,5 +1,3 @@
-// src/app/dosen/home/page.js
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -7,22 +5,24 @@ import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, getDocs } from "firebase/firestore";
+import Cookies from "js-cookie";
+
 
 const DosenHomePage = () => {
   const router = useRouter();
-  const [isAuthChecked, setIsAuthChecked] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState(false);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setIsAuthChecked(true);
-      } else {
-        router.push("/dosen/login");
-      }
-    });
-    return () => unsubscribe();
+    const dosenInfo = Cookies.get("dosen_info");
+
+    if (!dosenInfo) {
+      // Jika tidak ada data login, redirect ke login
+      router.push("/dosen/login");
+    } else {
+      setIsAuthorized(true); // sudah login
+    }
   }, [router]);
 
   useEffect(() => {
@@ -34,7 +34,7 @@ const DosenHomePage = () => {
         const courseList = courseDocs.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
-          progress: Math.floor(Math.random() * 100), // Optional: generate random progress
+          progress: Math.floor(Math.random() * 100),
         }));
         setCourses(courseList);
       } catch (error) {
@@ -43,27 +43,45 @@ const DosenHomePage = () => {
       setLoading(false);
     };
 
-    if (isAuthChecked) {
+    if (isAuthorized) {
       fetchCourses();
     }
-  }, [isAuthChecked]);
+  }, [isAuthorized]);
 
-  return isAuthChecked ? (
+  if (!isAuthorized) return null; // Hindari flashing konten kalau belum terotorisasi
+
+  return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-gradient-to-r from-purple-500 to-pink-500 p-6 shadow-lg text-white text-center">
         <h1 className="text-3xl font-bold">LeADS: Dashboard Dosen</h1>
       </header>
 
       <main className="flex-1 p-6">
-        {/* Section untuk Dashboard Cards */}
+        {/* Dashboard Cards */}
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <DashboardCard title="Messages" description="Communicate" color="bg-blue-500" />
-          <DashboardCard title="Profile" description="Your Profile" color="bg-green-500" />
-          <DashboardCard title="Settings" description="Preferences" color="bg-yellow-500" />
-          <DashboardCard title="Grades" description="Performance" color="bg-red-500" />
+          <DashboardCard
+            title="Messages"
+            description="Communicate"
+            color="bg-blue-500"
+          />
+          <DashboardCard
+            title="Profile"
+            description="Your Profile"
+            color="bg-green-500"
+          />
+          <DashboardCard
+            title="Settings"
+            description="Preferences"
+            color="bg-yellow-500"
+          />
+          <DashboardCard
+            title="Grades"
+            description="Performance"
+            color="bg-red-500"
+          />
         </div>
 
-        {/* Section untuk Menampilkan Semua Mata Kuliah */}
+        {/* Mata Kuliah */}
         <div className="mt-12 max-w-6xl mx-auto">
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
             Mata Kuliah yang Diakses
@@ -83,14 +101,13 @@ const DosenHomePage = () => {
                   Mata Kuliah {course.id} Kurikulum 511.2024
                 </p>
                 <ProgressBar progress={course.progress} />
-
-                {/* Button untuk navigasi ke halaman detail mata kuliah */}
                 <button
                   className="mt-4 bg-blue-500 hover:bg-blue-600 text-white text-sm py-2 px-6 rounded"
-                  onClick={() => {
-                    const targetUrl = `/dosen/mataKuliah/${encodeURIComponent(course.id)}`;
-                    router.push(targetUrl);
-                  }}
+                  onClick={() =>
+                    router.push(
+                      `/dosen/mataKuliah/${encodeURIComponent(course.id)}`
+                    )
+                  }
                 >
                   Go to Course Details
                 </button>
@@ -100,10 +117,9 @@ const DosenHomePage = () => {
         </div>
       </main>
     </div>
-  ) : null;
+  );
 };
 
-// Komponen untuk kartu dashboard
 const DashboardCard = ({ title, description, color }) => (
   <div
     className={`p-6 rounded-lg shadow-md ${color} text-white flex flex-col items-center justify-center text-center transform hover:scale-105 transition-transform duration-300`}
@@ -113,7 +129,6 @@ const DashboardCard = ({ title, description, color }) => (
   </div>
 );
 
-// Komponen untuk menampilkan progress bar
 const ProgressBar = ({ progress }) => (
   <div className="relative w-full h-4 bg-gray-200 rounded-full overflow-hidden">
     <div

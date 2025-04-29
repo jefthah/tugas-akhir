@@ -1,21 +1,14 @@
 "use client";
-import { useEffect, useState, useRef } from "react";
+
+import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import Navbar from "@/components/Navbar";
+import NavbarMahasiswaCourse from "@/components/NavbarMahasiswaCourse";
+import SidebarMahasiswa from "@/components/SidebarMahasiswa";
+import HeaderMahasiswaCourse from "@/components/HeaderMahasiswaCourse";
+import Footer from "@/components/Footer";
 import { useRouter } from "next/navigation";
-import Webcam from "react-webcam";
-
-const Breadcrumb = ({ path }) => (
-  <nav className="text-white text-sm mt-2 text-center">
-    {path.map((item, index) => (
-      <span key={index}>
-        {item}
-        {index < path.length - 1 && " / "}
-      </span>
-    ))}
-  </nav>
-);
+import Cookies from "js-cookie";
 
 const AbsensiDetail = ({ params }) => {
   const router = useRouter();
@@ -25,26 +18,29 @@ const AbsensiDetail = ({ params }) => {
 
   const [absensi, setAbsensi] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isAttending, setIsAttending] = useState(null);
-  const [isNotAttending, setIsNotAttending] = useState(null);
-  const webcamRef = useRef(null);
+  const [statusPresensi, setStatusPresensi] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [userNIM, setUserNIM] = useState(null);
 
-  const sessionData =
-    typeof window !== "undefined"
-      ? JSON.parse(sessionStorage.getItem("session_mahasiswa"))
-      : null;
-  const userNIM = sessionData?.nimOrNip || null;
-
+  // Ambil NIM dari cookie
   useEffect(() => {
-    console.log("🔎 Mencari absensi untuk:", namaMataKuliah, pertemuanId, idAbsensi);
+    const cookie = Cookies.get("session_mahasiswa");
+    if (cookie) {
+      try {
+        const parsed = JSON.parse(cookie);
+        setUserNIM(parsed.nim);
+      } catch (err) {
+        console.error("❌ Gagal parsing cookie session_mahasiswa:", err);
+      }
+    } else {
+      console.warn("⚠️ Cookie session_mahasiswa tidak ditemukan");
+    }
+  }, []);
 
+  // Ambil data absensi & status presensi mahasiswa
+  useEffect(() => {
     const fetchAbsensi = async () => {
       try {
-        if (!namaMataKuliah || !pertemuanId || !idAbsensi) {
-          console.error("⚠️ Parameter tidak lengkap.");
-          return;
-        }
-
         const absensiRef = doc(
           db,
           "mataKuliah",
@@ -55,85 +51,53 @@ const AbsensiDetail = ({ params }) => {
           idAbsensi
         );
 
-        console.log("📌 Query Firestore:", absensiRef.path);
-
         const absensiDoc = await getDoc(absensiRef);
         if (absensiDoc.exists()) {
-          console.log("✅ Absensi ditemukan:", absensiDoc.data());
           setAbsensi(absensiDoc.data());
 
-          // Cek apakah mahasiswa sudah absen
           if (userNIM) {
-            const studentAttendanceRef = doc(
-              db,
-              "mataKuliah",
-              namaMataKuliah,
-              "Pertemuan",
-              pertemuanId,
-              "Absensi",
-              idAbsensi,
-              "Mahasiswa",
-              userNIM
-            );
-
-            const studentAttendanceDoc = await getDoc(studentAttendanceRef);
-            if (studentAttendanceDoc.exists()) {
-              if (studentAttendanceDoc.data().isAvailable) {
-                setIsAttending("Sudah Hadir");
-              } else {
-                setIsNotAttending("Tidak Hadir");
+            const studentRef = doc(absensiRef, "Mahasiswa", userNIM);
+            const studentDoc = await getDoc(studentRef);
+            if (studentDoc.exists()) {
+              const data = studentDoc.data();
+              if (data.status === "hadir") {
+                setStatusPresensi("Hadir");
+              } else if (data.status === "tidak hadir") {
+                setStatusPresensi("Tidak Hadir");
               }
             }
           }
         } else {
-          console.error("❌ Absensi tidak ditemukan di Firestore.");
+          console.error("Absensi tidak ditemukan.");
         }
-      } catch (error) {
-        console.error("⚠️ Error saat mengambil absensi:", error);
+      } catch (err) {
+        console.error("Gagal mengambil data:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAbsensi();
-  }, [namaMataKuliah, pertemuanId, idAbsensi, userNIM]);
+    if (userNIM) fetchAbsensi();
+  }, [userNIM, namaMataKuliah, pertemuanId, idAbsensi]);
 
-  const saveAttendance = async () => {
-    try {
-      if (!userNIM) {
-        alert("❌ Gagal menyimpan kehadiran: Data pengguna tidak ditemukan.");
-        return;
-      }
-
-      const studentAttendanceRef = doc(
-        db,
-        "mataKuliah",
-        namaMataKuliah,
-        "Pertemuan",
-        pertemuanId,
-        "Absensi",
-        idAbsensi,
-        "Mahasiswa",
-        userNIM
-      );
-
-      await setDoc(studentAttendanceRef, { isAvailable: true });
-      setIsAttending("Sudah Hadir");
-      setIsNotAttending(null);
-      alert("✅ Kehadiran berhasil disimpan.");
-    } catch (error) {
-      console.error("❌ Gagal menyimpan kehadiran:", error);
-    }
+  const saveAttendance = () => {
+    router.push(
+      `/mahasiswa/face-recognition?matkul=${encodeURIComponent(
+        namaMataKuliah
+      )}&pertemuan=${encodeURIComponent(
+        pertemuanId
+      )}&absensi=${encodeURIComponent(idAbsensi)}`
+    );
   };
 
   const saveNonAttendance = async () => {
-    try {
-      if (!userNIM) {
-        alert("❌ Gagal menyimpan ketidakhadiran: Data pengguna tidak ditemukan.");
-        return;
-      }
+    if (!userNIM) {
+      alert("❌ NIM tidak ditemukan.");
+      return;
+    }
 
-      const studentAttendanceRef = doc(
+    try {
+      const studentRef = doc(
         db,
         "mataKuliah",
         namaMataKuliah,
@@ -145,68 +109,115 @@ const AbsensiDetail = ({ params }) => {
         userNIM
       );
 
-      await setDoc(studentAttendanceRef, { isAvailable: false });
-      setIsNotAttending("Tidak Hadir");
-      setIsAttending(null);
-      alert("✅ Status tidak hadir berhasil disimpan.");
-    } catch (error) {
-      console.error("❌ Gagal menyimpan ketidakhadiran:", error);
+      await setDoc(studentRef, {
+        status: "tidak hadir",
+        time: new Date().toISOString(),
+      });
+
+      setStatusPresensi("Tidak Hadir");
+      alert("🚫 Presensi tidak hadir dicatat.");
+    } catch (err) {
+      console.error("Gagal menyimpan kehadiran:", err);
+      alert("❌ Gagal menyimpan presensi.");
     }
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div className="p-8">Loading...</div>;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <Navbar />
-      <header className="bg-gradient-to-r from-purple-500 to-pink-500 p-8 text-white flex flex-col items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold">
-            2024 Ganjil | {namaMataKuliah.toUpperCase()}
-          </h1>
-          <Breadcrumb
-            path={[
-              "Dashboard",
-              "Courses",
-              "2024/2025 Ganjil",
-              namaMataKuliah,
-              "Detail Absensi",
-            ]}
-          />
-        </div>
-      </header>
-      <main className="flex-1 p-8">
-        <section className="container mx-auto bg-white rounded-lg shadow-md p-6 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Detail Absensi</h2>
-          {absensi ? (
-            <div className="bg-white p-6 rounded-lg shadow-lg text-center">
-              <h2 className="text-2xl font-semibold mb-4">Status Presensi</h2>
-              {isAttending === "Sudah Hadir" ? (
-                <p className="text-green-500 font-semibold">✅ Anda sudah melakukan absensi</p>
-              ) : isNotAttending === "Tidak Hadir" ? (
-                <p className="text-red-500 font-semibold">❌ Anda tidak hadir</p>
-              ) : (
-                <div>
-                  <button
-                    onClick={saveAttendance}
-                    className="px-6 py-2 bg-blue-500 text-white rounded-md font-semibold mr-4"
-                  >
-                    Hadir
-                  </button>
-                  <button
-                    onClick={saveNonAttendance}
-                    className="px-6 py-2 bg-red-500 text-white rounded-md font-semibold"
-                  >
-                    Tidak Hadir
-                  </button>
-                </div>
-              )}
+    <div className="relative min-h-screen overflow-x-hidden">
+      <SidebarMahasiswa
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+      />
+      <div
+        className={`transition-all duration-300 ease-in-out ${
+          sidebarOpen ? "ml-80" : "ml-0"
+        }`}
+        onClick={() => sidebarOpen && setSidebarOpen(false)}
+      >
+        <NavbarMahasiswaCourse
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+        />
+
+        <HeaderMahasiswaCourse
+          title={`2024 GANJIL | ${namaMataKuliah.toUpperCase()}`}
+          path={[
+            "Dashboard",
+            "Courses",
+            "2024/2025 Ganjil",
+            namaMataKuliah,
+            "Detail Absensi",
+          ]}
+        />
+
+        <main className="flex-1 p-8 bg-gray-50">
+          <section className="container mx-auto bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+              Detail Absensi
+            </h2>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white border border-gray-200 rounded-lg overflow-hidden">
+                <thead className="bg-blue-600 text-white">
+                  <tr>
+                    <th className="py-3 px-6 text-left">Date</th>
+                    <th className="py-3 px-6 text-left">Description</th>
+                    <th className="py-3 px-6 text-left">Status</th>
+                    <th className="py-3 px-6 text-left">Points</th>
+                    <th className="py-3 px-6 text-left">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody className="text-gray-700">
+                  <tr className="border-t">
+                    <td className="py-4 px-6">{absensi?.date || "-"}</td>
+                    <td className="py-4 px-6">{namaMataKuliah}</td>
+                    <td className="py-4 px-6 font-semibold">
+                      {statusPresensi || "-"}
+                    </td>
+                    <td className="py-4 px-6">
+                      {statusPresensi === "Hadir" ? "100" : "0"}
+                    </td>
+                    <td className="py-4 px-6">
+                      {statusPresensi === "Hadir"
+                        ? "Presensi Berhasil"
+                        : statusPresensi === "Tidak Hadir"
+                        ? "Tidak Hadir"
+                        : "-"}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-          ) : (
-            <p className="text-red-500 font-semibold">❌ Absensi tidak ditemukan</p>
-          )}
-        </section>
-      </main>
+
+            {!statusPresensi && (
+              <div className="flex flex-col sm:flex-row justify-center gap-4 mt-6">
+                <button
+                  onClick={saveAttendance}
+                  className="px-6 py-2 bg-blue-500 text-white rounded-md font-semibold"
+                >
+                  Hadir
+                </button>
+                <button
+                  onClick={saveNonAttendance}
+                  className="px-6 py-2 bg-red-500 text-white rounded-md font-semibold"
+                >
+                  Tidak Hadir
+                </button>
+              </div>
+            )}
+
+            {statusPresensi && (
+              <div className="text-center text-green-600 font-medium mt-6">
+                ✅ Anda sudah melakukan presensi.
+              </div>
+            )}
+          </section>
+        </main>
+
+        <Footer />
+      </div>
     </div>
   );
 };

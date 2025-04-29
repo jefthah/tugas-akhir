@@ -9,6 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@mediapipe/camera_utils": "^0.3.1675466862",
+    "@mediapipe/face_mesh": "^0.4.1633559619",
+    "@tensorflow-models/face-landmarks-detection": "^1.0.6",
+    "@tensorflow/tfjs": "^4.22.0",
     "cors": "^2.8.5",
     "face-api.js": "^0.22.2",
     "firebase": "^11.4.0",
@@ -18,6 +22,7 @@
     "react-dom": "^18",
     "react-hot-toast": "^2.5.2",
     "react-icons": "^5.5.0",
+    "react-webcam": "^7.2.0",
     "send": "^1.1.0",
     "undici": "^7.4.0"
   },

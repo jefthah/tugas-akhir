@@ -109,13 +109,27 @@ const CourseDetailPage = ({ params }) => {
         pertemuanId,
         "Absensi"
       );
-      const newAbsensiDoc = await addDoc(absensiRef, { isAvailable: true });
+  
+      const now = new Date();
+  
+      // Format tanggal dan jam
+      const formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(
+        now.getMonth() + 1
+      ).padStart(2, '0')}/${now.getFullYear()} ${String(
+        now.getHours()
+      ).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  
+      const newAbsensiDoc = await addDoc(absensiRef, {
+        isAvailable: true,
+        date: formattedDate,
+      });
+  
       const idAbsensi = newAbsensiDoc.id;
-
+  
       console.log(
         `Presensi berhasil dibuat untuk pertemuan ${pertemuanId} dengan idAbsensi: ${idAbsensi}`
       );
-
+  
       setTopics((prevTopics) =>
         prevTopics.map((topic) =>
           topic.id === pertemuanId
@@ -127,6 +141,8 @@ const CourseDetailPage = ({ params }) => {
       console.error("Error membuat presensi:", error);
     }
   };
+  
+  
 
   if (!isAuthChecked) return null;
 
