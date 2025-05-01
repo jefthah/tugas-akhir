@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import NavbarHome from "@/components/NavbarHome";
-import Footer from "@/components/Footer";
 import Cookies from "js-cookie";
 import * as faceapi from "face-api.js";
+import Footer from "@/components/Footer"; // Sesuaikan path berdasarkan folder
+import NavbarHome from "@/components/NavbarHome";
 
 export default function FaceRegistrationPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -22,9 +22,7 @@ export default function FaceRegistrationPage() {
   useEffect(() => {
     const loadModels = async () => {
       try {
-        await faceapi.nets.tinyFaceDetector.loadFromUri(
-          "/models/tiny_face_detector"
-        );
+        await faceapi.nets.tinyFaceDetector.loadFromUri("/models/tiny_face_detector");
         console.log("✅ Model face-api.js loaded");
       } catch (error) {
         console.error("❌ Error loading model:", error);
@@ -115,7 +113,7 @@ export default function FaceRegistrationPage() {
           }
         }
       } else {
-        setMessage("❌ Gagal menyimpan gambar: " + result.error);
+        setMessage(result.error || "❌ Terjadi kesalahan saat upload.");
       }
     } catch (err) {
       console.error("Upload error:", err);
@@ -143,7 +141,6 @@ export default function FaceRegistrationPage() {
           videoRef.current.srcObject = s;
         }
       })
-
       .catch((error) => {
         console.error("Camera error:", error);
         setMessage("❌ Kamera tidak tersedia.");
@@ -163,7 +160,7 @@ export default function FaceRegistrationPage() {
 
     const interval = setInterval(() => {
       captureAndUpload();
-    }, 1500);
+    }, 1500); // Ambil gambar setiap 1.5 detik
 
     return () => clearInterval(interval);
   }, [capturedCount, user.nim, captureAndUpload]);

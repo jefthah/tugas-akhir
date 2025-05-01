@@ -1,7 +1,5 @@
-// dosen/mataKuliah/[namaMataKuliah]/page.js
-
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -24,6 +22,7 @@ const CourseDetailPage = ({ params }) => {
   const [loading, setLoading] = useState(true);
   const [newTopic, setNewTopic] = useState("");
   const [error, setError] = useState("");
+  const [attendanceData, setAttendanceData] = useState({});
 
   const decodedNamaMataKuliah = decodeURIComponent(namaMataKuliah);
 
@@ -109,27 +108,27 @@ const CourseDetailPage = ({ params }) => {
         pertemuanId,
         "Absensi"
       );
-  
+
       const now = new Date();
-  
+
       // Format tanggal dan jam
-      const formattedDate = `${String(now.getDate()).padStart(2, '0')}/${String(
+      const formattedDate = `${String(now.getDate()).padStart(2, "0")}/${String(
         now.getMonth() + 1
-      ).padStart(2, '0')}/${now.getFullYear()} ${String(
+      ).padStart(2, "0")}/${now.getFullYear()} ${String(
         now.getHours()
-      ).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-  
+      ).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+
       const newAbsensiDoc = await addDoc(absensiRef, {
         isAvailable: true,
         date: formattedDate,
       });
-  
+
       const idAbsensi = newAbsensiDoc.id;
-  
+
       console.log(
         `Presensi berhasil dibuat untuk pertemuan ${pertemuanId} dengan idAbsensi: ${idAbsensi}`
       );
-  
+
       setTopics((prevTopics) =>
         prevTopics.map((topic) =>
           topic.id === pertemuanId
@@ -141,8 +140,53 @@ const CourseDetailPage = ({ params }) => {
       console.error("Error membuat presensi:", error);
     }
   };
-  
-  
+
+  const fetchAttendanceData = useCallback(
+    async (pertemuanId) => {
+      try {
+        const attendanceRef = collection(
+          db,
+          "mataKuliah",
+          decodedNamaMataKuliah,
+          "Pertemuan",
+          pertemuanId,
+          "Absensi"
+        );
+
+        const attendanceSnapshot = await getDocs(attendanceRef);
+        const attendanceList = [];
+
+        for (const doc of attendanceSnapshot.docs) {
+          const attendance = doc.data();
+          const nim = doc.id;
+          const studentFaceRef = ref(getStorage(), `faces/${nim}_face.png`);
+          const studentFaceUrl = await getDownloadURL(studentFaceRef);
+          attendanceList.push({ nim, ...attendance, faceUrl: studentFaceUrl });
+        }
+
+        // Debug log to check if data is being fetched properly
+        console.log("Attendance Data: ", attendanceList);
+
+        setAttendanceData((prevAttendanceData) => ({
+          ...prevAttendanceData,
+          [pertemuanId]: attendanceList,
+        }));
+      } catch (error) {
+        console.error("Error fetching attendance data:", error);
+      }
+    },
+    [decodedNamaMataKuliah]
+  );
+
+  useEffect(() => {
+    if (topics.length > 0) {
+      topics.forEach(async (topic) => {
+        if (topic.idAbsensi) {
+          await fetchAttendanceData(topic.id);
+        }
+      });
+    }
+  }, [topics, fetchAttendanceData]); // Add 'fetchAttendanceData' to dependencies
 
   if (!isAuthChecked) return null;
 
@@ -189,22 +233,16 @@ const CourseDetailPage = ({ params }) => {
                         {topic.topic || "No Topic Available"}
                       </h4>
 
-                      {/* Jika topik belum ada, tampilkan input dan tombol tambah */}
+                      {/* If the topic doesn't have one, allow input and add button */}
                       {!topic.topic && (
                         <div className="flex space-x-2">
-                          {/* Input text untuk topik */}
                           <input
                             type="text"
                             value={newTopic}
                             onChange={(e) => setNewTopic(e.target.value)}
                             placeholder="Masukkan nama topik"
                             className="border rounded p-2 text-gray-900 placeholder-gray-500"
-                            style={{
-                              color: "#1a202c", // warna teks (ubah sesuai kebutuhan)
-                              placeholderColor: "#718096", // warna placeholder
-                            }}
                           />
-
                           <button
                             onClick={() => handleAddTopic(topic.id)}
                             className="bg-green-500 text-white px-4 py-2 rounded-md"
@@ -229,6 +267,31 @@ const CourseDetailPage = ({ params }) => {
                             {topic.idAbsensi}
                           </span>
                         </p>
+                      )}
+
+                      {/* Show attendance data */}
+                      {attendanceData[topic.id] && (
+                        <div className="mt-4">
+                          <h5 className="text-lg font-semibold">Attendance:</h5>
+                          {attendanceData[topic.id].map((attendance) => (
+                            <div
+                              key={attendance.nim}
+                              className="flex items-center"
+                            >
+                              <Image
+                                src={attendance.faceUrl}
+                                alt={`Face of ${attendance.nim}`}
+                                width={50}
+                                height={50}
+                                className="rounded-full"
+                              />
+                              <p className="ml-4">
+                                NIM: {attendance.nim} | Status:{" "}
+                                {attendance.status}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                   </div>

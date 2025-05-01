@@ -3,21 +3,30 @@ import shutil
 import numpy as np
 import json
 import cv2
-import pandas as pd
+import firebase_admin
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, BatchNormalization
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.utils import to_categorical
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from sklearn.utils import class_weight
 import tensorflowjs as tfjs
 import mediapipe as mp
+from firebase_admin import credentials, storage
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATASET_DIR = os.path.join(BASE_DIR, "dataset_model_skripsi")
-EXPORT_DIR = os.path.join(BASE_DIR, "..", "public", "models", "face_recognition")
+# Setup Firebase Admin SDK
+cred = credentials.Certificate(os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib", "serviceAccountKey.json"))
+firebase_admin.initialize_app(cred, {
+    'storageBucket': 'tugas-akhir-c22c5.appspot.com'  # Firebase storage bucket name
+})
 
+# Firebase storage reference
+bucket = storage.bucket()
+
+# Directories for dataset and export (Note: not used for local storage)
+EXPORT_DIR = "/tmp/model_export"  # Temporary export directory, used in-memory for now
+
+# MediaPipe FaceMesh for feature extraction
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(
     static_image_mode=False,
@@ -37,53 +46,64 @@ def extract_landmarks(image):
         return np.array(landmarks)
     return None
 
+def upload_model_to_firebase(export_model_path):
+    """Upload the trained model files to Firebase"""
+    # Loop through the model files and upload them to Firebase
+    for file_name in os.listdir(export_model_path):
+        file_path = os.path.join(export_model_path, file_name)
+        blob = bucket.blob(f"models/face_recognition/{file_name}")
+        blob.upload_from_filename(file_path)
+        print(f"File {file_name} berhasil di-upload ke Firebase.")
+
 def train_and_export_model():
     """Training + Export TensorFlow.js format + labels.json"""
     print("📊 Mulai ekstraksi fitur wajah dan pelatihan model...")  # Log debug
     X, y = [], []
-    for label in os.listdir(DATASET_DIR):
-        folder = os.path.join(DATASET_DIR, label)
-        if not os.path.isdir(folder):
-            continue
-        for img in os.listdir(folder):
-            path = os.path.join(folder, img)
-            image = cv2.imread(path)
-            if image is not None:
-                img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                landmarks = extract_landmarks(img_rgb)
-                if landmarks is not None:
-                    X.append(landmarks)
-                    y.append(label)
+
+    # Get all the image blobs from Firebase
+    blobs = list(bucket.list_blobs(prefix="dataset/"))
+    print(f"Data ditemukan: {len(blobs)} gambar")
+
+    for blob in blobs:
+        print(f"Mengambil file: {blob.name}")
+        img_data = blob.download_as_string()
+        nparr = np.frombuffer(img_data, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if image is not None:
+            img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            landmarks = extract_landmarks(img_rgb)
+            if landmarks is not None:
+                X.append(landmarks)
+                y.append(blob.name.split('/')[1])  # Extract label from the folder name
 
     if len(X) == 0:
-        print("❌ Tidak ada data untuk training.")  # Log jika data kosong
+        print("❌ Tidak ada data untuk training.")  # Log if data is empty
         raise ValueError("❌ Tidak ada data untuk training.")
     
-    # Log jumlah data yang digunakan untuk training
+    # Log the number of images used for training
     print(f"📊 Total data: {len(X)} gambar")
 
     X = np.array(X)
     y = np.array(y)
 
-    # Log label unik yang ditemukan dalam dataset
+    # Log unique labels found in the dataset
     print(f"🧑‍🏫 Label unik ditemukan: {np.unique(y)}")
 
     label_encoder = LabelEncoder()
     y_encoded = label_encoder.fit_transform(y)
     
-    # Log hasil encoding label
+    # Log the encoding result
     print(f"🔢 Hasil encoding label: {y_encoded}")
 
-    y_cat = to_categorical(y_encoded)
+    y_cat = to_categorical(y_encoded)  # One-hot encode labels
 
     X_train, X_test, y_train, y_test = train_test_split(X, y_cat, test_size=0.2, random_state=42)
     
-    # Log pembagian data training dan testing
+    # Log training and testing data distribution
     print(f"📦 Data training: {len(X_train)}, Data testing: {len(X_test)}")
 
-    class_weights = class_weight.compute_class_weight('balanced', classes=np.unique(y_encoded), y=y_encoded)
-    class_weights = dict(enumerate(class_weights))
-
+    # Neural Network Model
     model = Sequential([
         Dense(256, activation='relu', input_shape=(X.shape[1],)),
         BatchNormalization(),
@@ -92,13 +112,13 @@ def train_and_export_model():
         BatchNormalization(),
         Dropout(0.3),
         Dense(64, activation='relu'),
-        Dense(len(label_encoder.classes_), activation='softmax')
+        Dense(len(label_encoder.classes_), activation='softmax')  # Output number of classes
     ])
 
     model.compile(optimizer=Adam(0.001), loss='categorical_crossentropy', metrics=['accuracy'])
 
-    print("📈 Melatih model dengan data...")  # Log melatih model
-    model.fit(X_train, y_train, epochs=20, validation_data=(X_test, y_test), class_weight=class_weights)
+    print("📈 Melatih model dengan data...")  # Log model training
+    model.fit(X_train, y_train, epochs=20, validation_data=(X_test, y_test))
 
     # Save TensorFlow.js model
     if os.path.exists(EXPORT_DIR):
@@ -111,6 +131,9 @@ def train_and_export_model():
     labels_path = os.path.join(EXPORT_DIR, "labels.json")
     with open(labels_path, "w") as f:
         f.write(json.dumps({str(i): name for i, name in enumerate(label_encoder.classes_)}))
+
+    # Upload the model files to Firebase
+    upload_model_to_firebase(EXPORT_DIR)
 
     return {
         "classes": label_encoder.classes_.tolist(),

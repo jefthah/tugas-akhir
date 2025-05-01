@@ -54,3 +54,5 @@ Backend/face_recognition_mediapipe.h5
 # Ignore virtual environment
 .venv310/
 
+# Firebase config
+Backend/lib/serviceAccountKey.json
