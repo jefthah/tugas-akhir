@@ -39,45 +39,48 @@ mtcnn_detector = MTCNN()
 
 @app.route("/upload-face", methods=["POST"])
 def upload_face():
-    """Endpoint untuk menerima gambar wajah dan menyimpannya ke Firebase"""
+    """Upload screenshot wajah ke Firebase berdasarkan matkul/pertemuan"""
     if 'image' not in request.files:
         return jsonify({"message": "No image file provided."}), 400
 
     image = request.files['image']
     nim = request.form.get("nim")
+    matkul = request.form.get("matkul")
+    pertemuan = request.form.get("pertemuan")
 
-    if not nim:
-        return jsonify({"message": "No NIM provided."}), 400
+    if not nim or not matkul or not pertemuan:
+        return jsonify({"message": "NIM, matkul, atau pertemuan tidak lengkap"}), 400
 
     try:
-        # Log received data for debugging
-        print("Received image:", image)
-        print("Received NIM:", nim)
-
-        # Process the image
+        # Baca gambar sebagai byte
         img = Image.open(image)
         img_byte_arr = BytesIO()
         img.save(img_byte_arr, format='PNG')
         img_byte_arr = img_byte_arr.getvalue()
 
+        # Nama dan path file di Firebase
         filename = f"{nim}_face.png"
-        blob = bucket.blob(f"faces/{filename}")  # Folder 'faces' will be automatically created
-        
-        # Upload image to Firebase Storage
+        storage_path = f"faces/{matkul}/{pertemuan}/{filename}"
+
+        blob = bucket.blob(storage_path)
         blob.upload_from_string(img_byte_arr, content_type='image/png')
 
-        # Get public URL of the uploaded image
         file_url = blob.public_url
 
-        return jsonify({"message": "Image uploaded successfully", "url": file_url}), 200
+        return jsonify({
+            "message": "✅ Wajah berhasil disimpan",
+            "url": file_url,
+            "path": storage_path
+        }), 200
 
     except Exception as e:
-        print("Error uploading image:", e)
-        return jsonify({"message": "Failed to upload image."}), 500
+        print("❌ Error saat upload wajah:", e)
+        return jsonify({"message": "Gagal upload gambar."}), 500
+
 
 @app.route("/register-image", methods=["POST"])
 def register_image():
-    """Upload gambar wajah untuk satu NIM dan mendeteksi wajah menggunakan MTCNN"""
+    """Upload gambar wajah + trigger retrain otomatis"""
     if "file" not in request.files or "nim" not in request.form:
         return jsonify({"error": "Missing file or NIM"}), 400
 
@@ -87,38 +90,47 @@ def register_image():
     if not nim or not nim.isdigit() or len(nim) != 10:
         return jsonify({"error": "NIM tidak valid"}), 400
 
-    # Prepare filename for Firebase Storage
-    filename = f"{nim}_{str(np.random.randint(100000))}.jpg"
+    try:
+        filename = f"{nim}_{np.random.randint(100000)}.jpg"
 
-    # Read and process the image
-    img = file.read()
-    img_array = np.frombuffer(img, np.uint8)
-    image = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        img = file.read()
+        img_array = np.frombuffer(img, np.uint8)
+        image = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    # Perform face detection using MTCNN
-    faces = mtcnn_detector.detect_faces(image_rgb)
-    if len(faces) == 0:
-        return jsonify({"error": "No face detected in the image"}), 400
+        faces = mtcnn_detector.detect_faces(image_rgb)
+        if len(faces) == 0:
+            return jsonify({"error": "No face detected in the image"}), 400
 
-    # Get the first detected face and crop it
-    x, y, w, h = faces[0]['box']
-    face_image = image_rgb[y:y+h, x:x+w]  # Crop the face from the image
+        x, y, w, h = faces[0]['box']
+        face_crop = image_rgb[y:y+h, x:x+w]
+        _, buffer = cv2.imencode('.jpg', cv2.cvtColor(face_crop, cv2.COLOR_RGB2BGR))
 
-    # Upload the cropped face image to Firebase Storage
-    blob = bucket.blob(f"dataset/{nim}/{filename}")
-    blob.upload_from_string(img, content_type="image/jpeg")
-    blob.make_public()
+        blob = bucket.blob(f"dataset/{nim}/{filename}")
+        blob.upload_from_string(buffer.tobytes(), content_type="image/jpeg")
+        blob.make_public()
+        file_url = blob.public_url
 
-    # The uploaded image URL
-    file_url = blob.public_url
+        with open(NIM_LOG_FILE, "w") as f:
+            f.write(nim)
 
-    # Save the NIM of the last registered user (optional)
-    with open(NIM_LOG_FILE, "w") as f:
-        f.write(nim)
+        print("✅ Wajah berhasil diupload. Sekarang melatih ulang model...")
 
-    # Returning success message
-    return jsonify({"message": f"✅ Gambar berhasil disimpan dan di-upload ke Firebase: {file_url}"}), 200
+        # Mulai training model ulang
+        train_result = train_and_export_model()
+        print("✅ Model retrained:", train_result)
+
+        return jsonify({
+            "message": "✅ Gambar disimpan dan model dilatih ulang!",
+            "url": file_url,
+            "classes": train_result.get("classes", [])
+        }), 200
+
+    except Exception as e:
+        print("❌ Error saat proses:", e)
+        return jsonify({"error": str(e)}), 500
+
+
 
 
 @app.route("/train-model", methods=["POST"])

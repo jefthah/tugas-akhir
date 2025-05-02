@@ -46,8 +46,11 @@ const FaceRecognitionPage = () => {
 
   const fetchLabels = async () => {
     try {
-      const response = await fetch("http://localhost:8000/models/face_recognition/labels.json"); // Backend API
+      const response = await fetch(
+        "http://localhost:8000/models/face_recognition/labels.json"
+      ); // Backend API
       const labels = await response.json();
+      console.log("Loaded labels: ", labels);
       setLabelEncoder(labels);
     } catch (error) {
       console.error("Failed to fetch labels.json", error);
@@ -56,7 +59,9 @@ const FaceRecognitionPage = () => {
 
   const loadModelFromBackend = async () => {
     try {
-      const response = await fetch("http://localhost:8000/models/face_recognition/model.json"); // Backend API untuk model
+      const response = await fetch(
+        "http://localhost:8000/models/face_recognition/model.json"
+      ); // Backend API untuk model
       const modelLoaded = await tf.loadLayersModel(response.url); // Load model using TensorFlow.js
       setModel(modelLoaded);
       console.log("Model loaded successfully from backend");
@@ -64,7 +69,6 @@ const FaceRecognitionPage = () => {
       console.error("Error loading model from backend:", error);
     }
   };
-  
 
   const confirmAttendance = useCallback(async () => {
     if (!userNIM || !matkul || !pertemuan || !absensi) {
@@ -125,15 +129,16 @@ const FaceRecognitionPage = () => {
         !userNIM
       )
         return;
-
+    
       const video = webcamRef.current.video;
       const faces = await detector.estimateFaces(video);
-      console.log("Detected faces: ", faces.length); // Log jumlah wajah terdeteksi
+      console.log("Detected faces: ", faces.length);
+    
       const ctx = canvasRef.current.getContext("2d");
       canvasRef.current.width = video.videoWidth;
       canvasRef.current.height = video.videoHeight;
       ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
+    
       if (faces.length > 0) {
         const face = faces[0];
         const landmarks = face.keypoints;
@@ -142,52 +147,56 @@ const FaceRecognitionPage = () => {
           p.y / video.height,
           p.z ?? 0,
         ]);
-
+    
         const prediction = model.predict(tf.tensor([features]));
         const data = await prediction.data();
-        console.log("Prediction data: ", data); // Log hasil prediksi model
+        console.log("Prediction data: ", data);
+    
         const predictedIndex = data.indexOf(Math.max(...data));
         const predictedLabel = labelEncoder[predictedIndex]?.toString().trim();
         const nimSession = userNIM?.toString().trim();
-
-        console.log("Predicted NIM: ", predictedLabel); // Log NIM yang diprediksi
-
-        // Update the UI with the predicted NIM
-        setPredictedText("Mahasiswa dengan NIM: " + predictedLabel); // Display predicted NIM
-
-        // If the predicted NIM matches the logged-in NIM
-        if (predictedLabel === nimSession) {
+        const confidence = Math.max(...data);
+    
+        console.log("Predicted NIM:", predictedLabel);
+        console.log("Confidence:", confidence);
+    
+        // Tampilkan hasil prediksi
+        setPredictedText("Mahasiswa dengan NIM: " + predictedLabel);
+    
+        if (confidence > 0.85 && predictedLabel === nimSession) {
           setIsProcessing(true);
           setLoadingRedirect(true);
-
-          // Create a screenshot and send it to the backend
+    
           const screenshot = webcamRef.current.getScreenshot();
           if (screenshot) {
             const formData = new FormData();
-            formData.append("image", dataURItoBlob(screenshot)); // Convert screenshot to blob
-            formData.append("nim", userNIM); // Send NIM as well
-
+            formData.append("image", dataURItoBlob(screenshot));
+            formData.append("nim", userNIM);
+            formData.append("matkul", matkul);
+            formData.append("pertemuan", pertemuan);
+    
             try {
-              const response = await fetch(
-                "http://localhost:8000/upload-face",
-                {
-                  method: "POST",
-                  body: formData, // Send the form data to backend
-                }
-              );
+              const response = await fetch("http://localhost:8000/upload-face", {
+                method: "POST",
+                body: formData,
+              });
+    
               const result = await response.json();
               if (response.ok) {
-                await confirmAttendance(); // Call attendance after uploading
+                await confirmAttendance();
               } else {
-                alert(result.message || "Failed to upload image.");
+                alert(result.message || "Gagal mengunggah gambar.");
               }
             } catch (error) {
-              console.error("Error sending image to backend:", error);
+              console.error("Gagal mengirim gambar:", error);
             }
           }
+        } else {
+          console.warn("❌ Confidence rendah atau NIM tidak cocok");
         }
       }
     };
+    
 
     // Helper function to convert data URL (Base64) to Blob
     const dataURItoBlob = (dataURI) => {
